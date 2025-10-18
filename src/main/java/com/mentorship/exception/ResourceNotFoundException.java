@@ -1,7 +1,7 @@
 package com.mentorship.exception;
 
-/*
-  A base exception for 404 - Not Found
+/**
+ * A base exception for 404 - Not Found
  */
 public class ResourceNotFoundException extends RuntimeException {
   public ResourceNotFoundException(String message) {

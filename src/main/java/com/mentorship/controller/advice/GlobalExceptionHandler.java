@@ -5,14 +5,19 @@ import com.mentorship.exception.ConflictException;
 import com.mentorship.exception.ForbiddenException;
 import com.mentorship.exception.ResourceNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
 import java.time.Instant;
+import java.util.stream.Collectors;
 
 @ControllerAdvice
 public class GlobalExceptionHandler {
@@ -22,53 +27,48 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(ResourceNotFoundException.class)
   public ResponseEntity<ErrorResponse> handleResourceNotFound(ResourceNotFoundException ex, HttpServletRequest request) {
     log.warn("Resource not found: {} (Request: {} {})", ex.getMessage(), request.getMethod(), request.getRequestURI());
-    ErrorResponse errorResponse = new ErrorResponse(
-            Instant.now(),
-            HttpStatus.NOT_FOUND.value(),
-            "Not Found",
-            ex.getMessage(),
-            request.getRequestURI()
-    );
-    return new ResponseEntity<>(errorResponse, HttpStatus.NOT_FOUND);
+    return buildResponseEntity(HttpStatus.NOT_FOUND, ex.getMessage(), request);
   }
 
   @ExceptionHandler(ConflictException.class)
   public ResponseEntity<ErrorResponse> handleConflict(ConflictException ex, HttpServletRequest request) {
     log.warn("Conflict detected: {} (Request: {} {})", ex.getMessage(), request.getMethod(), request.getRequestURI());
-    ErrorResponse errorResponse = new ErrorResponse(
-            Instant.now(),
-            HttpStatus.CONFLICT.value(),
-            "Conflict",
-            ex.getMessage(),
-            request.getRequestURI()
-    );
-    return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
+    return buildResponseEntity(HttpStatus.CONFLICT, ex.getMessage(), request);
   }
 
   @ExceptionHandler(ForbiddenException.class)
   public ResponseEntity<ErrorResponse> handleForbidden(ForbiddenException ex, HttpServletRequest request) {
     log.warn("Forbidden access: {} (Request: {} {})", ex.getMessage(), request.getMethod(), request.getRequestURI());
-    ErrorResponse errorResponse = new ErrorResponse(
-            Instant.now(),
-            HttpStatus.FORBIDDEN.value(),
-            "Forbidden",
-            ex.getMessage(),
-            request.getRequestURI()
-    );
-    return new ResponseEntity<>(errorResponse, HttpStatus.FORBIDDEN);
+    return buildResponseEntity(HttpStatus.FORBIDDEN, ex.getMessage(), request);
   }
 
   @ExceptionHandler(IllegalArgumentException.class)
   public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex, HttpServletRequest request) {
     log.warn("Bad request: {} (Request: {} {})", ex.getMessage(), request.getMethod(), request.getRequestURI());
-    ErrorResponse errorResponse = new ErrorResponse(
-            Instant.now(),
-            HttpStatus.BAD_REQUEST.value(),
-            "Bad Request",
-            ex.getMessage(),
-            request.getRequestURI()
-    );
-    return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+    return buildResponseEntity(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
+  }
+
+  @ExceptionHandler(MethodArgumentNotValidException.class)
+  public ResponseEntity<ErrorResponse> handleMethodArgumentNotValid(MethodArgumentNotValidException ex, HttpServletRequest request) {
+    String message = ex.getBindingResult().getAllErrors().stream()
+            .map(error -> {
+              if (error instanceof FieldError fieldError) {
+                return fieldError.getField() + ": " + fieldError.getDefaultMessage();
+              }
+              return error.getDefaultMessage();
+            })
+            .collect(Collectors.joining("; "));
+    log.warn("Validation failed: {} (Request: {} {})", message, request.getMethod(), request.getRequestURI());
+    return buildResponseEntity(HttpStatus.BAD_REQUEST, message, request);
+  }
+
+  @ExceptionHandler(ConstraintViolationException.class)
+  public ResponseEntity<ErrorResponse> handleConstraintViolation(ConstraintViolationException ex, HttpServletRequest request) {
+    String message = ex.getConstraintViolations().stream()
+            .map(violation -> violation.getPropertyPath() + ": " + violation.getMessage())
+            .collect(Collectors.joining("; "));
+    log.warn("Constraint violation: {} (Request: {} {})", message, request.getMethod(), request.getRequestURI());
+    return buildResponseEntity(HttpStatus.BAD_REQUEST, message, request);
   }
 
   /**
@@ -81,13 +81,21 @@ public class GlobalExceptionHandler {
     // This is for your monitoring/alerting system.
     log.error("Unhandled exception occurred (Request: {} {})", request.getMethod(), request.getRequestURI(), ex);
 
+    return buildResponseEntity(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            "An unexpected internal server error occurred. Please try again later.",
+            request
+    );
+  }
+
+  private ResponseEntity<ErrorResponse> buildResponseEntity(HttpStatus status, String message, HttpServletRequest request) {
     ErrorResponse errorResponse = new ErrorResponse(
             Instant.now(),
-            HttpStatus.INTERNAL_SERVER_ERROR.value(),
-            "Internal Server Error",
-            "An unexpected internal server error occurred. Please try again later.", // Hide internal details
+            status.value(),
+            status.getReasonPhrase(),
+            message,
             request.getRequestURI()
     );
-    return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
+    return new ResponseEntity<>(errorResponse, status);
   }
 }
