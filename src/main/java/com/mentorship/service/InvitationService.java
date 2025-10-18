@@ -16,6 +16,7 @@ import com.mentorship.repository.InvitationRepository;
 import com.mentorship.repository.MentorshipRepository;
 import com.mentorship.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -70,14 +71,14 @@ public class InvitationService {
 
   @Transactional
   public MentorshipResponse acceptInvitation(AcceptInviteRequest request) {
-    Invitation invitation = invitationRepository.findByToken(request.token())
+    Invitation invitation = invitationRepository.findAndLockByToken(request.token())
             .orElseThrow(() -> new ResourceNotFoundException("Invitation token not found"));
 
     if (invitation.getStatus() != InvitationStatus.PENDING) {
       throw new ConflictException("Invitation is no longer pending");
     }
 
-    User student = userRepository.findById(request.studentId())
+    User student = userRepository.findAndLockById(request.studentId())
             .orElseThrow(() -> new ResourceNotFoundException("Student not found"));
 
     if (student.getRole() != UserRole.STUDENT) {
@@ -99,7 +100,12 @@ public class InvitationService {
             .student(student)
             .build();
 
-    Mentorship savedMentorship = mentorshipRepository.save(newMentorship);
+    Mentorship savedMentorship;
+    try {
+      savedMentorship = mentorshipRepository.save(newMentorship);
+    } catch (DataIntegrityViolationException ex) {
+      throw new ConflictException("Student already has a mentor", ex);
+    }
 
     invitation.setStatus(InvitationStatus.ACCEPTED);
     invitationRepository.save(invitation);

@@ -1,7 +1,6 @@
 package com.mentorship.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
@@ -60,17 +59,17 @@ public class User {
 
   // --- Relationships ---
 
-  @OneToMany(mappedBy = "mentor", cascade = CascadeType.ALL, orphanRemoval = true)
+  @OneToMany(mappedBy = "mentor")
   @Builder.Default
   @JsonIgnore
   private Set<Invitation> sentInvitations = new HashSet<>();
 
-  @OneToMany(mappedBy = "mentor", cascade = CascadeType.ALL, orphanRemoval = true)
+  @OneToMany(mappedBy = "mentor")
   @Builder.Default
   @JsonIgnore
   private Set<Mentorship> mentorConnections = new HashSet<>();
 
-  @OneToOne(mappedBy = "student", cascade = CascadeType.ALL, orphanRemoval = true)
+  @OneToOne(mappedBy = "student")
   @JsonIgnore
   private Mentorship studentConnection;
 

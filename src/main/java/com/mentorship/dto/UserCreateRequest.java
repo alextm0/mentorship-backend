@@ -1,6 +1,6 @@
 package com.mentorship.dto;
 
-import com.mentorship.domain.UserRole; // Make sure this import is correct
+import com.mentorship.domain.UserRole;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -18,5 +18,5 @@ public record UserCreateRequest(
         String email,
 
         @NotNull(message = "Role cannot be null")
-        UserRole role // This should be "mentor" or "student" (lowercase)
+        UserRole role
 ) {}

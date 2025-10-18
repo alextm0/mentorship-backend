@@ -1,7 +1,7 @@
 package com.mentorship.exception;
 
-/*
-  A base exception for 409 - Conflict
+/**
+ * A base exception for 409 - Conflict
  */
 public class ConflictException extends RuntimeException {
   public ConflictException(String message) {

@@ -15,10 +15,10 @@ import com.mentorship.repository.MentorshipRepository;
 import com.mentorship.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
@@ -27,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
+@ActiveProfiles("test")
 @Transactional
 @DisplayName("Invitation Workflow Integration Tests")
 class InvitationWorkflowIntegrationTest {
@@ -87,86 +88,73 @@ class InvitationWorkflowIntegrationTest {
     assertThat(mentorshipRepository.findByStudent_Id(student.getId())).isPresent();
   }
 
-  @Nested
-  @DisplayName("When Creating an Invitation")
-  class WhenCreatingInvitation {
+  @Test
+  @DisplayName("should throw exception when a duplicate pending invite exists")
+  void createInvitation_preventsDuplicatePendingInvite() {
+    invitationService.createInvitation(new InviteRequest(mentor.getId(), "alex@example.com"));
 
-    @Test
-    @DisplayName("should throw exception when a duplicate pending invite exists")
-    void preventsDuplicatePendingInvite() {
-      invitationService.createInvitation(new InviteRequest(mentor.getId(), "alex@example.com"));
-
-      assertThatThrownBy(() -> invitationService.createInvitation(new InviteRequest(mentor.getId(), "Alex@example.com")))
-              .isInstanceOf(ConflictException.class)
-              .hasMessageContaining("pending invite");
-    }
-
-    @Test
-    @DisplayName("should throw exception when mentor invites themselves")
-    void throwsException_whenMentorInvitesThemselves() {
-      assertThatThrownBy(() -> invitationService.createInvitation(new InviteRequest(mentor.getId(), mentor.getEmail())))
-              .isInstanceOf(IllegalArgumentException.class)
-              .hasMessageContaining("Mentors cannot invite themselves");
-    }
-
-    @Test
-    @DisplayName("should throw exception when a student tries to send an invite")
-    void throwsException_whenStudentTriesToInvite() {
-      InviteRequest request = new InviteRequest(student.getId(), "another-student@example.com");
-
-      assertThatThrownBy(() -> invitationService.createInvitation(request))
-              .isInstanceOf(IllegalArgumentException.class)
-              .hasMessageContaining("Only mentors can send invitations");
-    }
+    assertThatThrownBy(() -> invitationService.createInvitation(new InviteRequest(mentor.getId(), "Alex@example.com")))
+            .isInstanceOf(ConflictException.class)
+            .hasMessageContaining("pending invite");
   }
 
-  @Nested
-  @DisplayName("When Accepting an Invitation")
-  class WhenAcceptingInvitation {
+  @Test
+  @DisplayName("should throw exception when mentor invites themselves")
+  void createInvitation_rejectsSelfInvite() {
+    assertThatThrownBy(() -> invitationService.createInvitation(new InviteRequest(mentor.getId(), mentor.getEmail())))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Mentors cannot invite themselves");
+  }
 
-    @Test
-    @DisplayName("should throw exception when an imposter student tries to accept")
-    void rejectsDifferentStudentEmail() {
-      InvitationResponse invitation = invitationService.createInvitation(new InviteRequest(mentor.getId(), "alex@example.com"));
-      User imposterStudent = userRepository.save(User.builder()
-              .id(UUID.randomUUID()).name("Imposter").email("imposter@example.com").role(UserRole.STUDENT).build());
+  @Test
+  @DisplayName("should throw exception when a student tries to send an invite")
+  void createInvitation_rejectsStudentInitiatedInvite() {
+    InviteRequest request = new InviteRequest(student.getId(), "another-student@example.com");
 
-      assertThatThrownBy(() ->
-              invitationService.acceptInvitation(new AcceptInviteRequest(invitation.token(), imposterStudent.getId()))
-      ).isInstanceOf(ForbiddenException.class).hasMessageContaining("not for you");
-    }
+    assertThatThrownBy(() -> invitationService.createInvitation(request))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Only mentors can send invitations");
+  }
 
-    @Test
-    @DisplayName("should throw exception when invitation is already accepted")
-    void throwsException_whenInvitationIsAlreadyAccepted() {
-      InvitationResponse invitation = invitationService.createInvitation(new InviteRequest(mentor.getId(), "alex@example.com"));
-      invitationService.acceptInvitation(new AcceptInviteRequest(invitation.token(), student.getId()));
+  @Test
+  @DisplayName("should throw exception when an imposter student tries to accept")
+  void acceptInvitation_rejectsDifferentStudentEmail() {
+    InvitationResponse invitation = invitationService.createInvitation(new InviteRequest(mentor.getId(), "alex@example.com"));
+    User imposterStudent = userRepository.save(User.builder()
+            .id(UUID.randomUUID()).name("Imposter").email("imposter@example.com").role(UserRole.STUDENT).build());
 
-      assertThatThrownBy(() ->
-              invitationService.acceptInvitation(new AcceptInviteRequest(invitation.token(), student.getId()))
-      ).isInstanceOf(ConflictException.class).hasMessageContaining("Invitation is no longer pending");
-    }
+    assertThatThrownBy(() ->
+            invitationService.acceptInvitation(new AcceptInviteRequest(invitation.token(), imposterStudent.getId()))
+    ).isInstanceOf(ForbiddenException.class).hasMessageContaining("not for you");
+  }
 
-    @Test
-    @DisplayName("should throw exception when student already has a mentor")
-    void throwsException_whenStudentAlreadyHasAMentor() {
-      // Arrange: Student accepts an invitation from the first mentor
-      invitationService.acceptInvitation(
-              new AcceptInviteRequest(
-                      invitationService.createInvitation(new InviteRequest(mentor.getId(), student.getEmail())).token(),
-                      student.getId()
-              )
-      );
+  @Test
+  @DisplayName("should throw exception when invitation is already accepted")
+  void acceptInvitation_rejectsAlreadyAcceptedInvitation() {
+    InvitationResponse invitation = invitationService.createInvitation(new InviteRequest(mentor.getId(), "alex@example.com"));
+    invitationService.acceptInvitation(new AcceptInviteRequest(invitation.token(), student.getId()));
 
-      // Arrange: A second mentor invites the same student
-      User secondMentor = userRepository.save(User.builder()
-              .id(UUID.randomUUID()).name("Second Mentor").email("second@example.com").role(UserRole.MENTOR).build());
-      InvitationResponse secondInvite = invitationService.createInvitation(new InviteRequest(secondMentor.getId(), student.getEmail()));
+    assertThatThrownBy(() ->
+            invitationService.acceptInvitation(new AcceptInviteRequest(invitation.token(), student.getId()))
+    ).isInstanceOf(ConflictException.class).hasMessageContaining("Invitation is no longer pending");
+  }
 
-      // Act & Assert: Student tries to accept the second invite
-      assertThatThrownBy(() ->
-              invitationService.acceptInvitation(new AcceptInviteRequest(secondInvite.token(), student.getId()))
-      ).isInstanceOf(ConflictException.class).hasMessageContaining("Student already has a mentor");
-    }
+  @Test
+  @DisplayName("should throw exception when student already has a mentor")
+  void acceptInvitation_rejectsStudentWithExistingMentor() {
+    invitationService.acceptInvitation(
+            new AcceptInviteRequest(
+                    invitationService.createInvitation(new InviteRequest(mentor.getId(), student.getEmail())).token(),
+                    student.getId()
+            )
+    );
+
+    User secondMentor = userRepository.save(User.builder()
+            .id(UUID.randomUUID()).name("Second Mentor").email("second@example.com").role(UserRole.MENTOR).build());
+    InvitationResponse secondInvite = invitationService.createInvitation(new InviteRequest(secondMentor.getId(), student.getEmail()));
+
+    assertThatThrownBy(() ->
+            invitationService.acceptInvitation(new AcceptInviteRequest(secondInvite.token(), student.getId()))
+    ).isInstanceOf(ConflictException.class).hasMessageContaining("Student already has a mentor");
   }
 }

@@ -51,7 +51,7 @@ Content-Type: application/json
 }
 
 ### Capture the token from the response
-@token = 89b8b321-a920-4d77-af2e-88282ff554e0
+@token =
 
 ### Accept Invitation (Student claims token)
 POST {{baseUrl}}/api/mentorship/accept

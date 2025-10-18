@@ -1,7 +1,7 @@
 package com.mentorship.exception;
 
-/*
-  A base exception for 403 - Forbidden
+/**
+ * A base exception for 403 - Forbidden
  */
 public class ForbiddenException extends RuntimeException {
   public ForbiddenException(String message) {
