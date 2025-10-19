@@ -1,0 +1,95 @@
+### -----------------------------------------------------------------
+### 0. VARIABLES
+### -----------------------------------------------------------------
+@baseUrl = http://localhost:8080
+
+@mentorId = 00000000-0000-0000-0000-000000000001
+@studentId = 00000000-0000-0000-0000-000000000002
+
+@mentorEmail = mentor@example.com
+@studentEmail = student@example.com
+
+### -----------------------------------------------------------------
+### 1. SETUP: Create Users
+### -----------------------------------------------------------------
+
+### Create Mentor User
+POST {{baseUrl}}/api/users
+Content-Type: application/json
+
+{
+  "id": "{{mentorId}}",
+  "name": "Mentor One",
+  "email": "{{mentorEmail}}",
+  "role": "MENTOR"
+}
+
+### Create Student User
+POST {{baseUrl}}/api/users
+Content-Type: application/json
+
+{
+  "id": "{{studentId}}",
+  "name": "Student One",
+  "email": "{{studentEmail}}",
+  "role": "STUDENT"
+}
+
+
+### -----------------------------------------------------------------
+### 2. WORKFLOW: The Invitation Flow
+### -----------------------------------------------------------------
+
+### Send Invitation (Mentor to Student)
+# @name: sendInvite
+POST {{baseUrl}}/api/mentorship/invite
+Content-Type: application/json
+
+{
+  "mentorId": "{{mentorId}}",
+  "studentEmail": "{{studentEmail}}"
+}
+
+### Capture the token from the response
+@token =
+
+### Accept Invitation (Student claims token)
+POST {{baseUrl}}/api/mentorship/accept
+Content-Type: application/json
+
+{
+  "token": "{{token}}",
+  "studentId": "{{studentId}}"
+}
+
+
+### -----------------------------------------------------------------
+### 3. VERIFICATION: Check the Connection
+### -----------------------------------------------------------------
+
+### Verify Mentor's Connection List
+# After the flow, the mentor should see the student in their list.
+GET {{baseUrl}}/api/mentorship/mentor/{{mentorId}}/connections
+
+### Verify Student's Connection
+# The student should now be linked to the mentor.
+GET {{baseUrl}}/api/mentorship/student/{{studentId}}/connection
+
+
+### -----------------------------------------------------------------
+### 4. HELPER/UTILITY ENDPOINTS
+### -----------------------------------------------------------------
+
+### List All Users
+GET {{baseUrl}}/api/users
+
+### Fetch User By Id
+GET {{baseUrl}}/api/users/{{mentorId}}
+
+### Lookup Invitations For Mentor
+# This should now show the invitation with status = ACCEPTED
+GET {{baseUrl}}/api/mentorship/mentor/{{mentorId}}/invitations
+
+### Fetch Invitation By Token
+# This should also show the invitation (and its ACCEPTED status)
+GET {{baseUrl}}/api/mentorship/invitations/token/{{token}}
