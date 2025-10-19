@@ -39,15 +39,16 @@ public class UserService {
     if (userRepository.existsById(request.id())) {
       throw new ConflictException("User with ID " + request.id() + " already exists");
     }
-    if (userRepository.existsByEmailIgnoreCase(request.email())) {
-      throw new ConflictException("User with email " + request.email() + " already exists");
+    String normalizedEmail = request.email().trim().toLowerCase(Locale.ROOT);
+    if (userRepository.existsByEmailIgnoreCase(normalizedEmail)) {
+      throw new ConflictException("User with email " + normalizedEmail + " already exists");
     }
 
     // Create new user entity
     User newUser = User.builder()
             .id(request.id())
             .name(request.name())
-            .email(request.email().toLowerCase(Locale.ROOT)) // Normalize email
+            .email(normalizedEmail)
             .role(request.role())
             .build();
 

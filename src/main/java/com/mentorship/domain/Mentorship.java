@@ -44,7 +44,7 @@ public class Mentorship {
 
   // The database enforces the "student has one mentor" rule via Flyway migrations.
   @OneToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "student_id", nullable = false)
+  @JoinColumn(name = "student_id", nullable = false, unique = true)
   private User student;
 
   @CreatedDate

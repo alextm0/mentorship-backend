@@ -16,6 +16,10 @@ public record InvitationResponse(
 ) {
 
   public static InvitationResponse from(Invitation invitation) {
+    if (invitation.getMentor() == null) {
+      throw new IllegalStateException("Invitation mentor cannot be null");
+    }
+
     return new InvitationResponse(
             invitation.getId(),
             invitation.getMentor().getId(),
